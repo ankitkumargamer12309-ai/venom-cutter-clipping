@@ -150,20 +150,55 @@ document.querySelectorAll(".option").forEach(button=>{
   selectedRatio=button.dataset.ratio;
  });
 });
-function generate(){
- const file=document.getElementById("video").files[0];
- const link=document.getElementById("videoLink").value.trim();
- const status=document.getElementById("status");
- if(!file&&!link){
-  status.textContent="Please upload a video or enter a supported video link.";
+async function generate(){
+ const file = document.getElementById("video").files[0];
+ const link = document.getElementById("videoLink").value.trim();
+ const status = document.getElementById("status");
+
+ if(!file && !link){
+  status.textContent = "Please select a video first.";
   return;
  }
- if(file&&link){
-  status.textContent="Please choose only one video source.";
+
+ if(link){
+  status.textContent = "Video link import is not connected yet. Please upload a video from your PC.";
   return;
  }
- status.textContent="Studio design ready. AI processing will be connected to the backend in the next stage.";
+
+ const data = new FormData();
+ data.append("video", file);
+
+ status.textContent = "Uploading and processing video... Please wait.";
+
+ try{
+  const response = await fetch(
+   "http://127.0.0.1:5001/api/process",
+   {method:"POST", body:data}
+  );
+
+  const result = await response.json();
+
+  if(!response.ok){
+   throw new Error(result.error || "Processing failed");
+  }
+
+  status.textContent = "Your clips are ready!";
+
+  result.clips.forEach((clip, index)=>{
+   const p = document.createElement("p");
+   const a = document.createElement("a");
+
+   a.href = "http://127.0.0.1:5001" + clip.download;
+   a.textContent = "DOWNLOAD CLIP " + (index + 1);
+   a.style.color = "#59ff35";
+   a.style.display = "block";
+   a.style.margin = "12px";
+
+   p.appendChild(a);
+   status.appendChild(p);
+  });
+
+ }catch(error){
+  status.textContent = "Error: " + error.message;
+ }
 }
-</script>
-</body>
-</html>
