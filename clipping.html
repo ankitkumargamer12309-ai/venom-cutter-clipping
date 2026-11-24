@@ -196,7 +196,7 @@ async function runVenomClipping() {
   formData.append("subtitleStyle", document.getElementById("subtitleStyle").value);
 
   button.disabled = true;
-  status.textContent = "Uploading video to your local VENOM server...";
+  status.textContent = "Uploading video to VENOM...";
 
   try {
     const response = await fetch(API_BASE + "/api/process", {
