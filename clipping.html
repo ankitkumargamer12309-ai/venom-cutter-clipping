@@ -141,10 +141,11 @@ footer span{color:#59ff35}
 
 <footer>MADE BY <span>@halcyon_011</span> · VENOM CUTTER CLIPPING</footer>
 
+<script src="backend-config.js"></script>
 <script>
 "use strict";
 
-const API_BASE = "http://127.0.0.1:5001";
+const API_BASE = String(window.VENOM_API_BASE || "http://127.0.0.1:5001").replace(/\/+$/, "");
 let selectedRatio = "9:16";
 
 document.querySelectorAll(".option").forEach((button) => {
@@ -223,7 +224,7 @@ async function runVenomClipping() {
 
     result.clips.forEach((clip, index) => {
       const linkElement = document.createElement("a");
-      linkElement.href = API_BASE + clip.download;
+      linkElement.href = new URL(clip.download, API_BASE).href;
       linkElement.textContent = "DOWNLOAD CLIP " + (index + 1);
       linkElement.style.display = "block";
       linkElement.style.color = "#59ff35";
@@ -234,7 +235,7 @@ async function runVenomClipping() {
     });
   } catch (error) {
     console.error("VENOM clipping request failed:", error);
-    status.textContent = "Could not reach the local VENOM server. Check that api.py is running, then review the browser Console for any CORS or connection error. Details: " + error.message;
+    status.textContent = "Could not reach the configured VENOM backend ("+API_BASE+"). Check that the backend is online and allows this website. Details: " + error.message;
   } finally {
     button.disabled = false;
   }
