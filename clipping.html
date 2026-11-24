@@ -134,7 +134,7 @@ footer span{color:#59ff35}
    <div class="feature"><span>✦</span> AI Titles & Editing</div>
    <div class="feature"><span>✦</span> Highlight Scoring</div>
   </div>
-  <button class="greenbtn" onclick="generate()">ANALYZE & CREATE CLIPS</button>
+  <button id="generateButton" class="greenbtn" type="button">ANALYZE & CREATE CLIPS</button>
   <div id="status"></div>
  </section>
 </main>
@@ -142,67 +142,105 @@ footer span{color:#59ff35}
 <footer>MADE BY <span>@halcyon_011</span> · VENOM CUTTER CLIPPING</footer>
 
 <script>
-let selectedRatio="9:16";
-document.querySelectorAll(".option").forEach(button=>{
- button.addEventListener("click",()=>{
-  document.querySelectorAll(".option").forEach(b=>b.classList.remove("active"));
-  button.classList.add("active");
-  selectedRatio=button.dataset.ratio;
- });
+"use strict";
+
+const API_BASE = "http://127.0.0.1:5001";
+let selectedRatio = "9:16";
+
+document.querySelectorAll(".option").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".option").forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    selectedRatio = button.dataset.ratio || "9:16";
+  });
 });
-async function generate(){
- const file = document.getElementById("video").files[0];
- const link = document.getElementById("videoLink").value.trim();
- const status = document.getElementById("status");
 
- if(!file && !link){
-  status.textContent = "Please select a video first.";
-  return;
- }
+async function runVenomClipping() {
+  const fileInput = document.getElementById("video");
+  const linkInput = document.getElementById("videoLink");
+  const status = document.getElementById("status");
+  const button = document.getElementById("generateButton");
 
- if(link){
-  status.textContent = "Video link import is not connected yet. Please upload a video from your PC.";
-  return;
- }
+  status.replaceChildren();
 
- const data = new FormData();
- data.append("video", file);
+  const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+  const link = linkInput ? linkInput.value.trim() : "";
 
- status.textContent = "Uploading and processing video... Please wait.";
-
- try{
-  const response = await fetch(
-   "http://127.0.0.1:5001/api/process",
-   {method:"POST", body:data}
-  );
-
-  const result = await response.json();
-
-  if(!response.ok){
-   throw new Error(result.error || "Processing failed");
+  if (!file && !link) {
+    status.textContent = "Please select a video from your PC first.";
+    return;
   }
 
-  status.textContent = "Your clips are ready!";
+  if (file && link) {
+    status.textContent = "Please use either a video upload or a video link, not both.";
+    return;
+  }
 
-  result.clips.forEach((clip, index)=>{
-   const p = document.createElement("p");
-   const a = document.createElement("a");
+  if (link) {
+    status.textContent = "Video-link importing is not connected yet. Please upload a video from your PC.";
+    return;
+  }
 
-   a.href = "http://127.0.0.1:5001" + clip.download;
-   a.textContent = "DOWNLOAD CLIP " + (index + 1);
-   a.style.color = "#59ff35";
-   a.style.display = "block";
-   a.style.margin = "12px";
+  if (!file.type || !file.type.startsWith("video/")) {
+    status.textContent = "Please choose a supported video file.";
+    return;
+  }
 
-   p.appendChild(a);
-   status.appendChild(p);
-  });
+  const formData = new FormData();
+  formData.append("video", file);
+  formData.append("duration", document.getElementById("duration").value);
+  formData.append("ratio", selectedRatio);
+  formData.append("quality", document.getElementById("quality").value);
+  formData.append("language", document.getElementById("language").value);
+  formData.append("subtitleStyle", document.getElementById("subtitleStyle").value);
 
- }catch(error){
-  status.textContent = "Error: " + error.message;
- }
+  button.disabled = true;
+  status.textContent = "Uploading video to your local VENOM server...";
+
+  try {
+    const response = await fetch(API_BASE + "/api/process", {
+      method: "POST",
+      body: formData
+    });
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("The local server returned an unreadable response.");
+    }
+
+    if (!response.ok) {
+      throw new Error(result.error || "Video processing failed.");
+    }
+
+    status.textContent = result.message || "Your clips are ready!";
+
+    if (!Array.isArray(result.clips) || result.clips.length === 0) {
+      status.textContent = "The server finished, but did not return any downloadable clips.";
+      return;
+    }
+
+    result.clips.forEach((clip, index) => {
+      const linkElement = document.createElement("a");
+      linkElement.href = API_BASE + clip.download;
+      linkElement.textContent = "DOWNLOAD CLIP " + (index + 1);
+      linkElement.style.display = "block";
+      linkElement.style.color = "#59ff35";
+      linkElement.style.margin = "12px";
+      linkElement.target = "_blank";
+      linkElement.rel = "noopener";
+      status.appendChild(linkElement);
+    });
+  } catch (error) {
+    console.error("VENOM clipping request failed:", error);
+    status.textContent = "Could not reach the local VENOM server. Check that api.py is running, then review the browser Console for any CORS or connection error. Details: " + error.message;
+  } finally {
+    button.disabled = false;
+  }
 }
-window.generate = generate;
+
+document.getElementById("generateButton").addEventListener("click", runVenomClipping);
 </script>
 </body>
 </html>
