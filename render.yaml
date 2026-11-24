@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: venom-cutter-api
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: https://ankitkumargamer12309-ai.github.io
+      - key: MAX_UPLOAD_MB
+        value: "100"
+      - key: MAX_VIDEO_SECONDS
+        value: "600"
