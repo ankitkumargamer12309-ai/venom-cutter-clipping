@@ -146,7 +146,7 @@ def find_motion_times(path: Path, metadata_path: Path) -> list[float]:
         if line.startswith("frame:"):
             if frame_time is not None and movement is not None and movement >= 6.0:
                 peaks.append(frame_time)
-            match = re.search(r"pts_time:([0-9]+(?:\\.[0-9]+)?)", line)
+            match = re.search(r"pts_time:([0-9]+(?:\.[0-9]+)?)", line)
             frame_time = float(match.group(1)) if match else None
             movement = None
         elif "lavfi.signalstats.YAVG=" in line:
