@@ -125,7 +125,41 @@ def find_scene_times(path: Path) -> list[float]:
     return times
 
 
-def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]) -> list[dict]:
+def find_motion_times(path: Path, metadata_path: Path) -> list[float]:
+    """Estimate visual movement from low-resolution frame differences with FFmpeg."""
+    metadata_path.unlink(missing_ok=True)
+    result = run_command(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(path),
+         "-vf", "fps=2,scale=160:90:flags=fast_bilinear,format=gray,"
+                "tblend=all_mode=difference,signalstats,"
+                f"metadata=print:file={metadata_path}",
+         "-an", "-f", "null", "-"],
+        timeout=180
+    )
+    if result.returncode != 0 or not metadata_path.exists():
+        return []
+    text = metadata_path.read_text(encoding="utf-8", errors="replace")
+    frame_time = None
+    movement = None
+    peaks = []
+    for line in text.splitlines():
+        if line.startswith("frame:"):
+            if frame_time is not None and movement is not None and movement >= 6.0:
+                peaks.append(frame_time)
+            match = re.search(r"pts_time:([0-9]+(?:\\.[0-9]+)?)", line)
+            frame_time = float(match.group(1)) if match else None
+            movement = None
+        elif "lavfi.signalstats.YAVG=" in line:
+            try:
+                movement = float(line.rsplit("=", 1)[1])
+            except ValueError:
+                movement = None
+    if frame_time is not None and movement is not None and movement >= 6.0:
+        peaks.append(frame_time)
+    return peaks
+
+
+def score_clip_windows(duration: float, target_seconds: int, scenes: list[float], motion_times: list[float] | None = None) -> list[dict]:
     """Rank candidate moments by scene-change activity as a lightweight proxy.
 
     This deterministic heuristic is not a trained gaming/semantic AI model.
@@ -139,18 +173,23 @@ def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]
     candidates = []
     latest_start = max(0.0, duration - clip_length)
     sorted_scenes = sorted(scenes)
+    sorted_motion = sorted(motion_times or [])
     start = 0.0
     while start <= latest_start + 0.001:
         end = min(duration, start + clip_length)
         events = [moment for moment in sorted_scenes if start <= moment <= end]
+        motion_events = [moment for moment in sorted_motion if start <= moment <= end]
         density = len(events) / max(1.0, clip_length)
+        motion_density = len(motion_events) / max(1.0, clip_length)
         burst = sum(1 for left, right in zip(events, events[1:]) if right - left <= 4.0)
-        raw_score = density * 70.0 + burst * 3.0
+        motion_burst = sum(1 for left, right in zip(motion_events, motion_events[1:]) if right - left <= 2.0)
+        raw_score = density * 35.0 + motion_density * 18.0 + burst * 2.0 + motion_burst * 1.5
         candidates.append({
             "start": round(start, 1),
             "end": round(end, 1),
             "score": round(min(100.0, raw_score), 1),
             "event_count": len(events),
+            "motion_count": len(motion_events),
         })
         start += step
 
@@ -166,8 +205,8 @@ def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]
     return sorted(selected, key=lambda item: item["start"])
 
 
-def choose_clip_windows(duration: float, target_seconds: int, scenes: list[float]) -> list[tuple[float, float]]:
-    ranked = score_clip_windows(duration, target_seconds, scenes)
+def choose_clip_windows(duration: float, target_seconds: int, scenes: list[float], motion_times: list[float] | None = None) -> list[tuple[float, float]]:
+    ranked = score_clip_windows(duration, target_seconds, scenes, motion_times)
     return [(item["start"], item["end"]) for item in ranked]
 
 
@@ -234,7 +273,8 @@ def process_video():
 
         duration = read_video_duration(source)
         scenes = find_scene_times(source)
-        windows = choose_clip_windows(duration, min(target_seconds, int(duration)), scenes)
+        motion_times = find_motion_times(source, job_dir / "motion_metadata.txt")
+        windows = choose_clip_windows(duration, min(target_seconds, int(duration)), scenes, motion_times)
         if not windows:
             raise ValueError("No suitable clip sections could be found in this video.")
 
@@ -250,7 +290,7 @@ def process_video():
 
         source.unlink(missing_ok=True)
         return jsonify(
-            message=f"{len(clips)} clips created. Highlights are ranked using scene-change activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
+            message=f"{len(clips)} clips created. Highlights are ranked using scene-change and frame-motion activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
             clips=clips
         )
     except ValueError as error:
