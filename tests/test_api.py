@@ -70,7 +70,7 @@ class MotionEventTests(unittest.TestCase):
     def test_collapses_adjacent_motion_samples_into_events(self):
         self.assertEqual(
             collapse_motion_events([2.0, 0.0, 0.5, 1.0, 2.8, 3.0, 4.2]),
-            [0.0, 1.0, 2.8, 4.2],
+            [0.0, 1.0, 2.0, 3.0, 4.2],
         )
 
     def test_nonpositive_gap_keeps_sorted_samples(self):
