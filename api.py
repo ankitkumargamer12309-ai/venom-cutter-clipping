@@ -321,17 +321,23 @@ def process_video():
         motion_times = find_motion_times(source, job_dir / "motion_metadata.txt")
         if duration_choice == "auto":
             target_seconds = choose_auto_duration(duration, scenes, motion_times)
-        windows = choose_clip_windows(duration, min(target_seconds, int(duration)), scenes, motion_times)
-        if not windows:
+        ranked_windows = score_clip_windows(
+            duration, min(target_seconds, int(duration)), scenes, motion_times
+        )
+        if not ranked_windows:
             raise ValueError("No suitable clip sections could be found in this video.")
 
         clips = []
-        for index, (start, end) in enumerate(windows, 1):
+        for index, window in enumerate(ranked_windows, 1):
+            start, end = window["start"], window["end"]
             filename = f"venom_clip_{index:02}.mp4"
             output = job_dir / filename
             render_clip(source, start, end, output, ratio, quality)
             clips.append({
                 "filename": filename, "start": round(start, 1), "end": round(end, 1),
+                "score": window["score"],
+                "scene_events": window["event_count"],
+                "motion_events": window.get("motion_count", 0),
                 "download": f"/api/download/{job_id}/{filename}"
             })
 
