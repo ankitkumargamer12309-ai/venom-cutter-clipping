@@ -116,10 +116,10 @@ def read_video_dimensions(path: Path) -> tuple[int, int]:
     )
     if result.returncode != 0:
         raise ValueError("The video's resolution could not be read.")
-    match = re.search(r"(\\d+)x(\\d+)", result.stdout.strip())
+    match = re.search(r"(\d+)x(\d+)", result.stdout.strip())
     if not match:
         raise ValueError("The uploaded video has no readable video dimensions.")
-    width, height = int(match.group(1)), int(match.group(2)))
+    width, height = int(match.group(1)), int(match.group(2))
     if width < 2 or height < 2:
         raise ValueError("The uploaded video's dimensions are invalid.")
     return width, height
