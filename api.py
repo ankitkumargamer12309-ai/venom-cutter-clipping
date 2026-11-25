@@ -189,7 +189,18 @@ def find_motion_times(path: Path, metadata_path: Path) -> list[float]:
                 movement = None
     if frame_time is not None and movement is not None and movement >= 6.0:
         peaks.append(frame_time)
-    return peaks
+    return collapse_motion_events(peaks)
+
+
+def collapse_motion_events(times: list[float], min_gap: float = 1.0) -> list[float]:
+    """Collapse consecutive motion samples into spaced event timestamps."""
+    if min_gap <= 0:
+        return sorted(times)
+    events = []
+    for timestamp in sorted(times):
+        if not events or timestamp - events[-1] >= min_gap:
+            events.append(timestamp)
+    return events
 
 
 def score_clip_windows(duration: float, target_seconds: int, scenes: list[float], motion_times: list[float] | None = None) -> list[dict]:
