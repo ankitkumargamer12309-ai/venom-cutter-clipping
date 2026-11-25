@@ -222,6 +222,20 @@ def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]
     return sorted(selected, key=lambda item: item["start"])
 
 
+def choose_auto_duration(duration: float, scenes: list[float], motion_times: list[float]) -> int:
+    """Choose a clip length from observed scene and motion activity."""
+    if duration <= 15:
+        return 15
+    activity_per_minute = (len(scenes) + len(motion_times)) / max(duration, 1.0) * 60.0
+    if activity_per_minute >= 8.0:
+        return 15
+    if activity_per_minute >= 4.0:
+        return 30
+    if activity_per_minute >= 1.5:
+        return 45
+    return 60
+
+
 def choose_clip_windows(duration: float, target_seconds: int, scenes: list[float], motion_times: list[float] | None = None) -> list[tuple[float, float]]:
     ranked = score_clip_windows(duration, target_seconds, scenes, motion_times)
     return [(item["start"], item["end"]) for item in ranked]
@@ -305,6 +319,8 @@ def process_video():
         duration = read_video_duration(source)
         scenes = find_scene_times(source)
         motion_times = find_motion_times(source, job_dir / "motion_metadata.txt")
+        if duration_choice == "auto":
+            target_seconds = choose_auto_duration(duration, scenes, motion_times)
         windows = choose_clip_windows(duration, min(target_seconds, int(duration)), scenes, motion_times)
         if not windows:
             raise ValueError("No suitable clip sections could be found in this video.")
@@ -321,7 +337,8 @@ def process_video():
 
         source.unlink(missing_ok=True)
         return jsonify(
-            message=f"{len(clips)} clips created. Highlights are ranked using scene-change and frame-motion activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
+            message=f"{len(clips)} clips created at {target_seconds}-second target duration. Highlights are ranked using scene-change and frame-motion activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
+            target_duration=target_seconds,
             clips=clips
         )
     except ValueError as error:
