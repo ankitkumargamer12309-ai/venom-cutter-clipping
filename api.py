@@ -108,6 +108,23 @@ def read_video_duration(path: Path) -> float:
     return duration
 
 
+def read_video_dimensions(path: Path) -> tuple[int, int]:
+    result = run_command(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", str(path)],
+        timeout=30
+    )
+    if result.returncode != 0:
+        raise ValueError("The video's resolution could not be read.")
+    match = re.search(r"(\\d+)x(\\d+)", result.stdout.strip())
+    if not match:
+        raise ValueError("The uploaded video has no readable video dimensions.")
+    width, height = int(match.group(1)), int(match.group(2)))
+    if width < 2 or height < 2:
+        raise ValueError("The uploaded video's dimensions are invalid.")
+    return width, height
+
+
 def find_scene_times(path: Path) -> list[float]:
     result = run_command(
         ["ffmpeg", "-hide_banner", "-i", str(path),
@@ -216,6 +233,18 @@ def render_clip(source: Path, start: float, end: float, output: Path, ratio: str
     if quality == "720p HD":
         width = int(width * 2 / 3)
         height = int(height * 2 / 3)
+    elif quality == "Original quality":
+        source_width, source_height = read_video_dimensions(source)
+        if ratio == "9:16":
+            height = source_height
+            width = max(2, int(height * 9 / 16))
+        elif ratio == "16:9":
+            width = source_width
+            height = max(2, int(width * 9 / 16))
+        else:
+            width = height = min(source_width, source_height)
+        width -= width % 2
+        height -= height % 2
     video_filter = (
         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
         f"crop={width}:{height},setsar=1"
@@ -264,6 +293,8 @@ def process_video():
         if ratio not in {"9:16", "16:9", "1:1"}:
             ratio = "9:16"
         quality = request.form.get("quality", "1080p HD")
+        if quality not in {"1080p HD", "720p HD", "Original quality"}:
+            quality = "1080p HD"
 
         job_id = uuid.uuid4().hex[:12]
         job_dir = JOBS_DIR / job_id
