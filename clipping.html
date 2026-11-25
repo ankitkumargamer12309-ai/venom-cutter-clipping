@@ -156,6 +156,15 @@ document.querySelectorAll(".option").forEach((button) => {
   });
 });
 
+function formatClipTime(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return "time unavailable";
+  const whole = Math.floor(value);
+  const minutes = Math.floor(whole / 60);
+  const remainder = whole % 60;
+  return String(minutes).padStart(2, "0") + ":" + String(remainder).padStart(2, "0");
+}
+
 async function runVenomClipping() {
   const fileInput = document.getElementById("video");
   const linkInput = document.getElementById("videoLink");
@@ -232,6 +241,17 @@ async function runVenomClipping() {
       linkElement.target = "_blank";
       linkElement.rel = "noopener";
       status.appendChild(linkElement);
+
+      const details = document.createElement("div");
+      details.textContent =
+        "Activity score: " + (Number.isFinite(Number(clip.score)) ? Number(clip.score).toFixed(1) + "/100" : "N/A") +
+        " · Scene changes: " + (Number.isFinite(Number(clip.scene_events)) ? clip.scene_events : "N/A") +
+        " · Motion peaks: " + (Number.isFinite(Number(clip.motion_events)) ? clip.motion_events : "N/A") +
+        " · " + formatClipTime(clip.start) + "–" + formatClipTime(clip.end);
+      details.style.color = "#9da99d";
+      details.style.fontSize = "12px";
+      details.style.margin = "0 12px 14px";
+      status.appendChild(details);
     });
   } catch (error) {
     console.error("VENOM clipping request failed:", error);
