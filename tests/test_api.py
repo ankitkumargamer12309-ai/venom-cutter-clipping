@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import api
-from api import choose_auto_duration, score_clip_windows
+from api import choose_auto_duration, collapse_motion_events, score_clip_windows
 
 
 class AutoDurationTests(unittest.TestCase):
@@ -64,6 +64,17 @@ class RateLimitCleanupTests(unittest.TestCase):
             self.assertTrue(api.check_rate_limit("same-client"))
             self.assertTrue(api.check_rate_limit("same-client"))
             self.assertFalse(api.check_rate_limit("same-client"))
+
+
+class MotionEventTests(unittest.TestCase):
+    def test_collapses_adjacent_motion_samples_into_events(self):
+        self.assertEqual(
+            collapse_motion_events([2.0, 0.0, 0.5, 1.0, 2.8, 3.0, 4.2]),
+            [0.0, 1.0, 2.8, 4.2],
+        )
+
+    def test_nonpositive_gap_keeps_sorted_samples(self):
+        self.assertEqual(collapse_motion_events([3.0, 1.0, 2.0], 0), [1.0, 2.0, 3.0])
 
 
 if __name__ == "__main__":
