@@ -38,6 +38,8 @@ PROCESS_LOCK = threading.Lock()
 RATE_LIMIT = {}
 RATE_LIMIT_WINDOW = 15 * 60
 RATE_LIMIT_MAX = 3
+RATE_LIMIT_SWEEP_INTERVAL = 60
+_last_rate_limit_sweep = 0
 
 
 @app.after_request
@@ -72,7 +74,21 @@ def clean_expired_jobs():
 
 
 def check_rate_limit(ip):
+    global _last_rate_limit_sweep
     now = time.time()
+
+    # Periodically remove expired IP entries so the in-memory store stays bounded
+    # by recent activity rather than growing forever across old clients.
+    if now - _last_rate_limit_sweep >= RATE_LIMIT_SWEEP_INTERVAL:
+        expired_before = now - RATE_LIMIT_WINDOW
+        stale_ips = [
+            address for address, stamps in RATE_LIMIT.items()
+            if not stamps or max(stamps) < expired_before
+        ]
+        for address in stale_ips:
+            RATE_LIMIT.pop(address, None)
+        _last_rate_limit_sweep = now
+
     recent = [stamp for stamp in RATE_LIMIT.get(ip, []) if now - stamp < RATE_LIMIT_WINDOW]
     if len(recent) >= RATE_LIMIT_MAX:
         RATE_LIMIT[ip] = recent
