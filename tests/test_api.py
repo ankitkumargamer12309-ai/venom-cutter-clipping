@@ -33,6 +33,12 @@ class ClipWindowTests(unittest.TestCase):
         self.assertEqual(score_clip_windows(7, 15, [], []), [])
 
 
+    def test_combined_scene_and_motion_events_are_counted(self):
+        self.assertEqual(api.count_combined_events([10.0, 20.0, 30.0], [11.5, 20.5, 40.0]), 2)
+
+    def test_combined_event_count_is_zero_without_nearby_motion(self):
+        self.assertEqual(api.count_combined_events([10.0, 20.0], [15.0, 25.0]), 0)
+
 class RateLimitCleanupTests(unittest.TestCase):
     def setUp(self):
         self.original_rate_limit = dict(api.RATE_LIMIT)
