@@ -5,7 +5,7 @@ from api import choose_auto_duration, score_clip_windows
 
 class AutoDurationTests(unittest.TestCase):
     def test_high_activity_selects_short_duration(self):
-        self.assertEqual(choose_auto_duration(120, [1, 2, 3, 4], [5, 6, 7, 8, 9, 10, 11, 12]), 15)
+        self.assertEqual(choose_auto_duration(120, [1, 2, 3, 4, 14, 15, 16, 17, 18, 19], [5, 6, 7, 8, 9, 10, 11, 12]), 15)
 
     def test_medium_high_activity_selects_30_seconds(self):
         self.assertEqual(choose_auto_duration(120, [1, 2, 3], [5, 6, 7, 8, 9]), 30)
