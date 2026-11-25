@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+import api
 from api import choose_auto_duration, score_clip_windows
 
 
@@ -29,6 +31,39 @@ class ClipWindowTests(unittest.TestCase):
 
     def test_too_short_duration_has_no_windows(self):
         self.assertEqual(score_clip_windows(7, 15, [], []), [])
+
+
+class RateLimitCleanupTests(unittest.TestCase):
+    def setUp(self):
+        self.original_rate_limit = dict(api.RATE_LIMIT)
+        self.original_sweep = api._last_rate_limit_sweep
+        api.RATE_LIMIT.clear()
+        api._last_rate_limit_sweep = 0
+
+    def tearDown(self):
+        api.RATE_LIMIT.clear()
+        api.RATE_LIMIT.update(self.original_rate_limit)
+        api._last_rate_limit_sweep = self.original_sweep
+
+    def test_sweep_removes_expired_ips_and_preserves_recent_entries(self):
+        now = 5000.0
+        api.RATE_LIMIT["expired-client"] = [now - api.RATE_LIMIT_WINDOW - 1]
+        api.RATE_LIMIT["recent-client"] = [now - 30]
+
+        with patch.object(api.time, "time", return_value=now):
+            self.assertTrue(api.check_rate_limit("new-client"))
+
+        self.assertNotIn("expired-client", api.RATE_LIMIT)
+        self.assertEqual(api.RATE_LIMIT["recent-client"], [now - 30])
+        self.assertEqual(api.RATE_LIMIT["new-client"], [now])
+
+    def test_rate_limit_still_blocks_fourth_request_in_window(self):
+        now = 7000.0
+        with patch.object(api.time, "time", return_value=now):
+            self.assertTrue(api.check_rate_limit("same-client"))
+            self.assertTrue(api.check_rate_limit("same-client"))
+            self.assertTrue(api.check_rate_limit("same-client"))
+            self.assertFalse(api.check_rate_limit("same-client"))
 
 
 if __name__ == "__main__":
