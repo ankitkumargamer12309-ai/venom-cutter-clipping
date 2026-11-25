@@ -125,28 +125,50 @@ def find_scene_times(path: Path) -> list[float]:
     return times
 
 
-def choose_clip_windows(duration: float, target_seconds: int, scenes: list[float]) -> list[tuple[float, float]]:
-    max_clips = 6
-    if scenes:
-        stride = max(1, len(scenes) // max_clips)
-        windows = []
-        for moment in scenes[::stride][:max_clips]:
-            start = max(0.0, min(duration - min(target_seconds, duration), moment - target_seconds / 2))
-            end = min(duration, start + target_seconds)
-            if end - start >= 8 and all(abs(start - old[0]) > target_seconds * 0.65 for old in windows):
-                windows.append((start, end))
-        if windows:
-            return windows
+def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]) -> list[dict]:
+    """Rank candidate moments by scene-change activity as a lightweight proxy.
 
-    count = max(1, min(max_clips, int(duration // 75) or 1))
-    windows = []
-    for index in range(count):
-        center = duration * (index + 0.5) / count
-        start = max(0.0, min(duration - min(target_seconds, duration), center - target_seconds / 2))
-        end = min(duration, start + target_seconds)
-        if end - start >= 8:
-            windows.append((start, end))
-    return windows
+    This deterministic heuristic is not a trained gaming/semantic AI model.
+    """
+    max_clips = 6
+    clip_length = min(float(target_seconds), duration)
+    if clip_length < 8:
+        return []
+
+    step = max(3.0, min(10.0, clip_length / 4))
+    candidates = []
+    latest_start = max(0.0, duration - clip_length)
+    sorted_scenes = sorted(scenes)
+    start = 0.0
+    while start <= latest_start + 0.001:
+        end = min(duration, start + clip_length)
+        events = [moment for moment in sorted_scenes if start <= moment <= end]
+        density = len(events) / max(1.0, clip_length)
+        burst = sum(1 for left, right in zip(events, events[1:]) if right - left <= 4.0)
+        raw_score = density * 70.0 + burst * 3.0
+        candidates.append({
+            "start": round(start, 1),
+            "end": round(end, 1),
+            "score": round(min(100.0, raw_score), 1),
+            "event_count": len(events),
+        })
+        start += step
+
+    if not candidates:
+        candidates.append({"start": 0.0, "end": round(clip_length, 1), "score": 0.0, "event_count": 0})
+
+    selected = []
+    for candidate in sorted(candidates, key=lambda item: item["score"], reverse=True):
+        if all(abs(candidate["start"] - chosen["start"]) >= clip_length * 0.65 for chosen in selected):
+            selected.append(candidate)
+            if len(selected) >= max_clips:
+                break
+    return sorted(selected, key=lambda item: item["start"])
+
+
+def choose_clip_windows(duration: float, target_seconds: int, scenes: list[float]) -> list[tuple[float, float]]:
+    ranked = score_clip_windows(duration, target_seconds, scenes)
+    return [(item["start"], item["end"]) for item in ranked]
 
 
 def render_clip(source: Path, start: float, end: float, output: Path, ratio: str, quality: str):
@@ -228,7 +250,7 @@ def process_video():
 
         source.unlink(missing_ok=True)
         return jsonify(
-            message=f"{len(clips)} clips created. This version uses scene-change detection; automatic subtitles and semantic AI ranking are not enabled yet.",
+            message=f"{len(clips)} clips created. Highlights are ranked using scene-change activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
             clips=clips
         )
     except ValueError as error:
