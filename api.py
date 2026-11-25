@@ -203,6 +203,24 @@ def collapse_motion_events(times: list[float], min_gap: float = 1.0) -> list[flo
     return events
 
 
+def count_combined_events(scenes: list[float], motion_times: list[float], tolerance: float = 2.0) -> int:
+    """Count gameplay moments where a scene transition and motion burst co-occur."""
+    scene_values = sorted(scenes)
+    motion_values = sorted(motion_times)
+    i = j = matches = 0
+    while i < len(scene_values) and j < len(motion_values):
+        delta = scene_values[i] - motion_values[j]
+        if abs(delta) <= tolerance:
+            matches += 1
+            i += 1
+            j += 1
+        elif delta < 0:
+            i += 1
+        else:
+            j += 1
+    return matches
+
+
 def score_clip_windows(duration: float, target_seconds: int, scenes: list[float], motion_times: list[float] | None = None) -> list[dict]:
     """Rank candidate moments by scene-change activity as a lightweight proxy.
 
@@ -227,13 +245,20 @@ def score_clip_windows(duration: float, target_seconds: int, scenes: list[float]
         motion_density = len(motion_events) / max(1.0, clip_length)
         burst = sum(1 for left, right in zip(events, events[1:]) if right - left <= 4.0)
         motion_burst = sum(1 for left, right in zip(motion_events, motion_events[1:]) if right - left <= 2.0)
-        raw_score = density * 35.0 + motion_density * 18.0 + burst * 2.0 + motion_burst * 1.5
+        combined_events = count_combined_events(events, motion_events)
+        # Gaming moments often combine rapid visual movement with a scene transition.
+        # This is a signal-based heuristic, not semantic recognition of kills or wins.
+        raw_score = (
+            density * 30.0 + motion_density * 20.0 + burst * 2.0
+            + motion_burst * 1.5 + combined_events * 7.0
+        )
         candidates.append({
             "start": round(start, 1),
             "end": round(end, 1),
             "score": round(min(100.0, raw_score), 1),
             "event_count": len(events),
             "motion_count": len(motion_events),
+            "combined_event_count": combined_events,
         })
         start += step
 
@@ -365,6 +390,7 @@ def process_video():
                 "score": window["score"],
                 "scene_events": window["event_count"],
                 "motion_events": window.get("motion_count", 0),
+                "combined_events": window.get("combined_event_count", 0),
                 "download": f"/api/download/{job_id}/{filename}"
             })
 
