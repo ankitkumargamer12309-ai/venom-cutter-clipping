@@ -47,16 +47,53 @@ footer span{color:#55ff36}
  Sign in to access your personal AI clipping studio.
  </p>
 
- <button class="google" onclick="alert('Google Sign-In will be activated after secure authentication setup.')">
+ <button class="google" id="googleSignIn" type="button">
  Continue with Google
  </button>
 
  <p class="note">
- Google sign-in will be activated after secure account setup.
+ Firebase Google sign-in. Add your Firebase web-app config and enable Google provider to activate.
  </p>
+ <p class="note" id="loginStatus" role="status" aria-live="polite"></p>
 
  <a class="back" href="index.html">← BACK TO HOME</a>
  <footer>MADE BY <span>@halcyon_011</span></footer>
 </div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// Replace these values with the Firebase Web App config from Project settings.
+const firebaseConfig = {
+  apiKey: "PASTE_FIREBASE_API_KEY",
+  authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
+  projectId: "PASTE_PROJECT_ID",
+  appId: "PASTE_FIREBASE_APP_ID"
+};
+
+const button = document.getElementById("googleSignIn");
+const status = document.getElementById("loginStatus");
+const isConfigured = Object.values(firebaseConfig).every((value) => value && !value.startsWith("PASTE_"));
+
+button.addEventListener("click", async () => {
+  if (!isConfigured) {
+    status.textContent = "Firebase setup needed: add your Web App config first."; 
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "Opening Google sign-in…";
+  try {
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+    status.textContent = "Signed in. Opening clipping studio…";
+    window.location.href = "clipping.html";
+  } catch (error) {
+    status.textContent = error.message || "Google sign-in failed. Check Firebase settings."; 
+    button.disabled = false;
+  }
+});
+</script>
 </body>
 </html>
