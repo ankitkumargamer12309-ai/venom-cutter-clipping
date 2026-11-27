@@ -35,7 +35,12 @@ button{border:0;cursor:pointer;font-weight:bold}
 .features{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .feature{background:#0b110b;padding:13px;border-radius:7px;color:#cbd5cb;font-size:13px}
 .feature span{color:#59ff35;margin-right:7px}
-#status{font-size:13px;color:#59ff35;margin-top:15px;line-height:1.5}\n.progress-wrap{margin-top:16px;padding:14px;background:#0b110b;border:1px solid #293729;border-radius:9px}\n.progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#cbd5cb;margin-bottom:9px}\n.progress-track{height:10px;background:#202a20;border-radius:99px;overflow:hidden}\n.progress-fill{height:100%;width:0;background:#59ff35;border-radius:99px;transition:width .35s ease}\n.progress-note{font-size:11px;color:#899689;margin-top:8px}
+#status{font-size:13px;color:#59ff35;margin-top:15px;line-height:1.5}
+.progress-wrap{margin-top:16px;padding:14px;background:#0b110b;border:1px solid #293729;border-radius:9px}
+.progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#cbd5cb;margin-bottom:9px}
+.progress-track{height:10px;background:#202a20;border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:#59ff35;border-radius:99px;transition:width .35s ease}
+.progress-note{font-size:11px;color:#899689;margin-top:8px}
 footer{text-align:center;padding:30px;color:#899689;font-size:12px}
 footer span{color:#59ff35}
 @media(max-width:650px){.uploads,.row{grid-template-columns:1fr}.options{grid-template-columns:1fr 1fr}h1{font-size:28px}main{padding:14px}.panel{padding:17px}}
@@ -59,6 +64,7 @@ footer span{color:#59ff35}
     <h3>UPLOAD VIDEO</h3>
     <p>Select a video from your PC</p>
     <input id="video" type="file" accept="video/*">
+    <video id="videoPreview" controls playsinline style="display:none;width:100%;max-height:260px;margin-top:14px;border-radius:8px;background:#000"></video>
    </div>
    <div class="uploadbox">
     <div class="symbol">↗</div>
@@ -135,6 +141,11 @@ footer span{color:#59ff35}
    <div class="feature"><span>✦</span> Highlight Scoring</div>
   </div>
   <button id="generateButton" class="greenbtn" type="button">ANALYZE & CREATE CLIPS</button>
+  <div id="progressWrap" class="progress-wrap" style="display:none">
+   <div class="progress-head"><span id="progressLabel">Preparing video...</span><span id="progressPercent">0%</span></div>
+   <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+   <div id="progressNote" class="progress-note">Progress is an estimate while the server processes the video.</div>
+  </div>
   <div id="status"></div>
  </section>
 </main>
@@ -205,7 +216,24 @@ async function runVenomClipping() {
   formData.append("subtitleStyle", document.getElementById("subtitleStyle").value);
 
   button.disabled = true;
-  status.textContent = "Uploading video to VENOM...";
+  const progressWrap = document.getElementById("progressWrap");
+  const progressFill = document.getElementById("progressFill");
+  const progressPercent = document.getElementById("progressPercent");
+  const progressLabel = document.getElementById("progressLabel");
+  const progressNote = document.getElementById("progressNote");
+  progressWrap.style.display = "block";
+  progressFill.style.width = "0%";
+  progressPercent.textContent = "0%";
+  progressLabel.textContent = "Uploading video...";
+  progressNote.textContent = "Progress is estimated; the server does not send exact processing progress.";
+  let progress = 0;
+  const progressTimer = setInterval(() => {
+    progress = Math.min(90, progress + Math.max(1, Math.round((90 - progress) / 12)));
+    progressFill.style.width = progress + "%";
+    progressPercent.textContent = progress + "%";
+    progressLabel.textContent = progress < 25 ? "Uploading video..." : progress < 60 ? "Analyzing video..." : "Creating clips...";
+  }, 700);
+  status.textContent = "VENOM is processing your video...";
 
   try {
     const response = await fetch(API_BASE + "/api/process", {
@@ -267,12 +295,32 @@ async function runVenomClipping() {
     });
   } catch (error) {
     console.error("VENOM clipping request failed:", error);
-    progressLabel.textContent = "Could not create clips";\n    progressNote.textContent = "Backend error: " + error.message;
+    clearInterval(progressTimer);
+    progressLabel.textContent = "Could not create clips";
+    progressNote.textContent = "Backend error: " + error.message;
+    progressFill.style.width = progress + "%";
+    progressPercent.textContent = progress + "%";
   } finally {
     button.disabled = false;
   }
 }
 
+const videoInput = document.getElementById("video");
+const videoPreview = document.getElementById("videoPreview");
+let previewUrl = null;
+videoInput.addEventListener("change", () => {
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  const selectedFile = videoInput.files && videoInput.files[0];
+  if (!selectedFile) {
+    videoPreview.removeAttribute("src");
+    videoPreview.style.display = "none";
+    previewUrl = null;
+    return;
+  }
+  previewUrl = URL.createObjectURL(selectedFile);
+  videoPreview.src = previewUrl;
+  videoPreview.style.display = "block";
+});
 document.getElementById("generateButton").addEventListener("click", runVenomClipping);
 </script>
 </body>
