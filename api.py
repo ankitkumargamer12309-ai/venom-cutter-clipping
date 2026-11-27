@@ -350,7 +350,7 @@ def generate_ai_titles(clips: list[dict]) -> list[dict]:
             "Return only valid JSON: {\\"titles\\":[\\"title 1\\", ...]}. Data: " + json.dumps(summaries)}],
         "temperature": 0.4,
         "max_tokens": 250,
-    "provider": {"allow_fallbacks": true}
+    "provider": {"allow_fallbacks": True}
     }
     request_data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
