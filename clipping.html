@@ -35,7 +35,7 @@ button{border:0;cursor:pointer;font-weight:bold}
 .features{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .feature{background:#0b110b;padding:13px;border-radius:7px;color:#cbd5cb;font-size:13px}
 .feature span{color:#59ff35;margin-right:7px}
-#status{font-size:13px;color:#59ff35;margin-top:15px;line-height:1.5}
+#status{font-size:13px;color:#59ff35;margin-top:15px;line-height:1.5}\n.progress-wrap{margin-top:16px;padding:14px;background:#0b110b;border:1px solid #293729;border-radius:9px}\n.progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#cbd5cb;margin-bottom:9px}\n.progress-track{height:10px;background:#202a20;border-radius:99px;overflow:hidden}\n.progress-fill{height:100%;width:0;background:#59ff35;border-radius:99px;transition:width .35s ease}\n.progress-note{font-size:11px;color:#899689;margin-top:8px}
 footer{text-align:center;padding:30px;color:#899689;font-size:12px}
 footer span{color:#59ff35}
 @media(max-width:650px){.uploads,.row{grid-template-columns:1fr}.options{grid-template-columns:1fr 1fr}h1{font-size:28px}main{padding:14px}.panel{padding:17px}}
@@ -224,7 +224,12 @@ async function runVenomClipping() {
       throw new Error(result.error || "Video processing failed.");
     }
 
-    status.textContent = result.message || "Your clips are ready!";
+    clearInterval(progressTimer);
+    progress = 100;
+    progressFill.style.width = "100%";
+    progressPercent.textContent = "100%";
+    progressLabel.textContent = "Clips are ready!";
+    progressNote.textContent = result.message || "Video processing completed.";
 
     if (!Array.isArray(result.clips) || result.clips.length === 0) {
       status.textContent = "The server finished, but did not return any downloadable clips.";
@@ -255,7 +260,7 @@ async function runVenomClipping() {
     });
   } catch (error) {
     console.error("VENOM clipping request failed:", error);
-    status.textContent = "Could not reach the configured VENOM backend ("+API_BASE+"). Check that the backend is online and allows this website. Details: " + error.message;
+    progressLabel.textContent = "Could not create clips";\n    progressNote.textContent = "Backend error: " + error.message;
   } finally {
     button.disabled = false;
   }
