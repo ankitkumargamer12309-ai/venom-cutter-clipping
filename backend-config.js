@@ -1,4 +1,4 @@
 // VENOM CUTTER backend connection
-// Keep localhost for local testing. After a cloud backend is deployed,
-// replace this value with its HTTPS base URL (for example: https://your-service.example.com).
-window.VENOM_API_BASE = "http://127.0.0.1:5001";
+// Render service URL configured for the deployed GitHub Pages frontend.
+// If the Render service name/URL differs, update this value to the service's HTTPS URL.
+window.VENOM_API_BASE = "https://venom-cutter-api.onrender.com";
