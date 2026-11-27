@@ -3,7 +3,7 @@ services:
     name: venom-cutter-api
     runtime: docker
     plan: free
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
     region: singapore
     healthCheckPath: /api/health
     envVars:
