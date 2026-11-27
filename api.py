@@ -347,7 +347,7 @@ def generate_ai_titles(clips: list[dict]) -> list[dict]:
         "messages": [{"role": "user", "content":
             "Create short, catchy but accurate gaming clip titles from these activity statistics. "
             "Do not claim specific game actions or events because you cannot see the video. "
-            "Return only valid JSON: {\\"titles\\":[\\"title 1\\", ...]}. Data: " + json.dumps(summaries)}],
+            "Return a JSON object with a titles array. Data:  + json.dumps(summaries)}],
         "temperature": 0.4,
         "max_tokens": 250,
     "provider": {"allow_fallbacks": True}
