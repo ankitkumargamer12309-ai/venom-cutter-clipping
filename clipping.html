@@ -237,6 +237,13 @@ async function runVenomClipping() {
     }
 
     result.clips.forEach((clip, index) => {
+      const titleElement = document.createElement("div");
+      titleElement.textContent = clip.ai_title || "Clip " + (index + 1);
+      titleElement.style.color = "#59ff35";
+      titleElement.style.fontWeight = "bold";
+      titleElement.style.margin = "14px 12px 6px";
+      status.appendChild(titleElement);
+
       const linkElement = document.createElement("a");
       linkElement.href = new URL(clip.download, API_BASE).href;
       linkElement.textContent = "DOWNLOAD CLIP " + (index + 1);
