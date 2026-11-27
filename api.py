@@ -6,6 +6,9 @@ It is a lightweight baseline, not semantic AI ranking.
 from __future__ import annotations
 
 import os
+import json
+import urllib.request
+import urllib.error
 import re
 import shutil
 import subprocess
@@ -327,6 +330,52 @@ def render_clip(source: Path, start: float, end: float, output: Path, ratio: str
         raise RuntimeError("FFmpeg could not export a clip. Try a smaller or different video.")
 
 
+def generate_ai_titles(clips: list[dict]) -> list[dict]:
+    """Add optional AI titles using OpenRouter; fall back without failing clipping."""
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key or not clips:
+        return clips
+    model = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip()
+    summaries = [
+        {"clip": index + 1, "duration_seconds": round(item["end"] - item["start"], 1),
+         "activity_score": item.get("score", 0), "scene_events": item.get("scene_events", 0),
+         "motion_events": item.get("motion_events", 0)}
+        for index, item in enumerate(clips)
+    ]
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content":
+            "Create short, catchy but accurate gaming clip titles from these activity statistics. "
+            "Do not claim specific game actions or events because you cannot see the video. "
+            "Return only valid JSON: {\\"titles\\":[\\"title 1\\", ...]}. Data: " + json.dumps(summaries)}],
+        "temperature": 0.4,
+        "max_tokens": 250,
+    "provider": {"allow_fallbacks": true}
+    }
+    request_data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=request_data,
+        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json",
+                 "HTTP-Referer": "https://ankitkumargamer12309-ai.github.io/venom-cutter-clipping/",
+                 "X-Title": "VENOM CUTTER"},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        content = result["choices"][0]["message"]["content"]
+        if isinstance(content, list):
+            content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+        parsed = json.loads(content)
+        titles = parsed.get("titles", []) if isinstance(parsed, dict) else []
+        for index, clip in enumerate(clips):
+            title = titles[index] if index < len(titles) else ""
+            if isinstance(title, str) and title.strip():
+                clip["ai_title"] = title.strip()[:100]
+    except Exception as error:
+        app.logger.warning("OpenRouter title generation unavailable: %s", type(error).__name__)
+    return clips
+
 @app.get("/api/health")
 def health():
     return jsonify(ok=True, service="VENOM CUTTER", mode="scene-change-clipping")
@@ -394,6 +443,7 @@ def process_video():
                 "download": f"/api/download/{job_id}/{filename}"
             })
 
+        clips = generate_ai_titles(clips)
         source.unlink(missing_ok=True)
         return jsonify(
             message=f"{len(clips)} clips created at {target_seconds}-second target duration. Highlights are ranked using scene-change and frame-motion activity (a heuristic, not a trained gaming AI model). Automatic subtitles and semantic AI ranking are not enabled yet.",
